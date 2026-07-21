@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kalkulator Profit Saham IPO</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f7f6; margin: 20px; color: #333; }
+        h2 { text-align: center; color: #2c3e50; }
+        .form-container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-start; }
+        .input-group { display: flex; flex-direction: column; }
+        label { font-weight: bold; font-size: 14px; margin-bottom: 5px; }
+        input, select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 180px; }
+        #kodeEmiten { text-transform: uppercase; width: 90px; }
+        .row-inline { display: flex; gap: 5px; }
+        button { background-color: #27ae60; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 22px; }
+        button:hover { background-color: #219150; }
+        .btn-tarik { background-color: #3498db; margin-top: 0; padding: 8px 12px; }
+        .btn-tarik:hover { background-color: #2980b9; }
+        table { width: 100%; border-collapse: collapse; background-color: #fff; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: center; font-size: 14px; }
+        th { background-color: #34495e; color: white; }
+        .profit { color: #27ae60; font-weight: bold; }
+        .loss { color: #e74c3c; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h2>Kalkulator Profit Saham IPO Multi-Akun</h2>
+
+    <div class="form-container">
+        <div class="input-group">
+            <label>Nama Akun / Pemilik</label>
+            <input type="text" id="namaAkun" placeholder="Misal: Budi (Ajaib)">
+        </div>
+        
+        <div class="input-group">
+            <label>Kode Emiten</label>
+            <div class="row-inline">
+                <input type="text" id="kodeEmiten" placeholder="GOTO">
+                <button type="button" class="btn-tarik" id="btnTarik" onclick="tarikHargaOtomatis()">Tarik Harga</button>
+            </div>
+        </div>
+
+        <div class="input-group">
+            <label>Jumlah Lot</label>
+            <input type="number" id="jumlahLot" placeholder="Contoh: 10">
+        </div>
+        
+        <div class="input-group">
+            <label>Harga Beli (Rp)</label>
+            <input type="number" id="hargaBeli" placeholder="Harga saat IPO">
+        </div>
+        
+        <div class="input-group">
+            <label>Harga Jual / Saat Ini (Rp)</label>
+            <input type="number" id="hargaJual" placeholder="Bisa otomatis/manual">
+        </div>
+        
+        <div class="input-group">
+            <label>Status Saham</label>
+            <select id="statusSaham">
+                <option value="belum">Belum Dijual (Unrealized)</option>
+                <option value="sudah">Sudah Dijual (Realized)</option>
+            </select>
+        </div>
+        
+        <button onclick="tambahData()">Tambah ke Tabel</button>
+    </div>
+
+    <table id="tabelHasil">
+        <thead>
+            <tr>
+                <th>Akun Siapa</th>
+                <th>Emiten</th>
+                <th>Lot</th>
+                <th>Harga Beli</th>
+                <th>Harga Jual/Kini</th>
+                <th>Total Beli</th>
+                <th>Total Jual/Kini</th>
+                <th>Unrealized Profit</th>
+                <th>Realized Profit</th>
+                <th>Persentase (%)</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <script>
+        function formatRupiah(angka) {
+            return "Rp " + angka.toLocaleString('id-ID');
+        }
+
+        async function tarikHargaOtomatis() {
+            let emiten = document.getElementById("kodeEmiten").value.trim().toUpperCase();
+            let btn = document.getElementById("btnTarik");
+
+            if (!emiten) {
+                alert("Masukkan kode emiten dulu!");
+                return;
+            }
+
+            btn.innerHTML = "Mencari...";
+            btn.disabled = true;
+
+            try {
+                let url = `https://query1.finance.yahoo.com/v8/finance/chart/${emiten}.JK`;
+                let proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+                let response = await fetch(proxyUrl);
+                let data = await response.json();
+                let parsedData = JSON.parse(data.contents);
+
+                if (parsedData.chart.result === null) throw new Error("Tidak ditemukan");
+
+                let hargaKini = parsedData.chart.result[0].meta.regularMarketPrice;
+                document.getElementById("hargaJual").value = hargaKini;
+            } catch (error) {
+                alert("Gagal mengambil harga otomatis. Silakan ketik manual.");
+            } finally {
+                btn.innerHTML = "Tarik Harga";
+                btn.disabled = false;
+            }
+        }
+
+        function tambahData() {
+            let nama = document.getElementById("namaAkun").value;
+            let emiten = document.getElementById("kodeEmiten").value.toUpperCase();
+            let lot = parseFloat(document.getElementById("jumlahLot").value);
+            let beli = parseFloat(document.getElementById("hargaBeli").value);
+            let jual = parseFloat(document.getElementById("hargaJual").value);
+            let status = document.getElementById("statusSaham").value;
+
+            if (!nama || !emiten || !lot || !beli || !jual) {
+                alert("Tolong isi semua kotaknya ya!");
+                return;
+            }
+
+            let totalBeli = beli * lot * 100;
+            let totalJual = jual * lot * 100;
+            let selisih = totalJual - totalBeli;
+            let persentase = (selisih / totalBeli) * 100;
+
+            let unrealized = status === "belum" ? selisih : 0;
+            let realized = status === "sudah" ? selisih : 0;
+
+            let warnaPersentase = persentase >= 0 ? "profit" : "loss";
+            let warnaUnrealized = unrealized >= 0 ? "profit" : "loss";
+            let warnaRealized = realized >= 0 ? "profit" : "loss";
+
+            let teksUnrealized = unrealized !== 0 ? formatRupiah(unrealized) : "-";
+            let teksRealized = realized !== 0 ? formatRupiah(realized) : "-";
+
+            let tabel = document.getElementById("tabelHasil").getElementsByTagName('tbody')[0];
+            let barisBaru = tabel.insertRow();
+
+            barisBaru.innerHTML = `
+                <td>${nama}</td>
+                <td><strong>${emiten}</strong></td>
+                <td>${lot}</td>
+                <td>${formatRupiah(beli)}</td>
+                <td>${formatRupiah(jual)}</td>
+                <td>${formatRupiah(totalBeli)}</td>
+                <td>${formatRupiah(totalJual)}</td>
+                <td class="${warnaUnrealized}">${teksUnrealized}</td>
+                <td class="${warnaRealized}">${teksRealized}</td>
+                <td class="${warnaPersentase}">${persentase.toFixed(2)}%</td>
+            `;
+
+            document.getElementById("namaAkun").value = "";
+            document.getElementById("jumlahLot").value = "";
+        }
+    </script>
+</body>
+</html>
