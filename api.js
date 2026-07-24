@@ -1,14 +1,23 @@
-// Yahoo Finance API Integration
+// Stock Price API Integration - Supports US & Indonesia Stocks
 class StockPriceAPI {
     constructor() {
         this.cache = new Map();
-        this.updateInterval = 1000; // Update every second
+        this.updateInterval = 1000;
         this.priceSubscribers = new Map();
     }
 
-    // Use RapidAPI Yahoo Finance endpoint
+    isIndonesianStock(symbol) {
+        if (!symbol) return false;
+        const upper = symbol.toUpperCase();
+        return upper.includes('.JK') || this.isCommonIndonesianStock(upper);
+    }
+
+    isCommonIndonesianStock(symbol) {
+        const indonesianStocks = ['BBCA', 'BBRI', 'BNI', 'BRI', 'ASII', 'TLKM', 'UNVR', 'INDF', 'JSMR', 'BMRI'];
+        return indonesianStocks.includes(symbol.toUpperCase());
+    }
+
     async fetchStockPrice(symbol) {
-        // Check cache first (if less than 5 seconds old)
         if (this.cache.has(symbol)) {
             const cached = this.cache.get(symbol);
             if (Date.now() - cached.timestamp < 5000) {
@@ -17,11 +26,10 @@ class StockPriceAPI {
         }
 
         try {
-            // Using free Yahoo Finance API through rapid-api
             const options = {
                 method: 'GET',
                 headers: {
-                    'x-rapidapi-key': 'YOUR_RAPIDAPI_KEY', // User will need to add their key
+                    'x-rapidapi-key': 'YOUR_RAPIDAPI_KEY',
                     'x-rapidapi-host': 'yh-finance.p.rapidapi.com'
                 }
             };
@@ -46,7 +54,6 @@ class StockPriceAPI {
             return price;
         } catch (error) {
             console.error(`Error fetching price for ${symbol}:`, error);
-            // Return cached price if available, even if old
             if (this.cache.has(symbol)) {
                 return this.cache.get(symbol).price;
             }
@@ -54,10 +61,8 @@ class StockPriceAPI {
         }
     }
 
-    // Alternative: Use free API without authentication
     async fetchStockPriceFree(symbol) {
         try {
-            // Using alternative free API
             const response = await fetch(
                 `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbol}`
             );
@@ -87,7 +92,22 @@ class StockPriceAPI {
         }
     }
 
-    // Subscribe to price updates
+    async fetchIndonesianStockPrice(symbol) {
+        if (this.cache.has(symbol)) {
+            return this.cache.get(symbol).price;
+        }
+        console.warn(`Indonesia stock ${symbol} price not available. Use manual price input.`);
+        return null;
+    }
+
+    async fetchPrice(symbol) {
+        if (this.isIndonesianStock(symbol)) {
+            return await this.fetchIndonesianStockPrice(symbol);
+        } else {
+            return await this.fetchStockPriceFree(symbol);
+        }
+    }
+
     subscribeToPriceUpdates(symbol, callback) {
         if (!this.priceSubscribers.has(symbol)) {
             this.priceSubscribers.set(symbol, []);
@@ -95,7 +115,6 @@ class StockPriceAPI {
         this.priceSubscribers.get(symbol).push(callback);
     }
 
-    // Unsubscribe from price updates
     unsubscribeFromPriceUpdates(symbol, callback) {
         if (!this.priceSubscribers.has(symbol)) return;
         const subscribers = this.priceSubscribers.get(symbol);
@@ -105,13 +124,20 @@ class StockPriceAPI {
         }
     }
 
-    // Notify all subscribers of price update
     notifyPriceUpdate(symbol, price) {
         if (this.priceSubscribers.has(symbol)) {
             this.priceSubscribers.get(symbol).forEach(callback => {
                 callback(price);
             });
         }
+    }
+
+    setManualPrice(symbol, price) {
+        this.cache.set(symbol, {
+            price: price,
+            timestamp: Date.now()
+        });
+        this.notifyPriceUpdate(symbol, price);
     }
 }
 
