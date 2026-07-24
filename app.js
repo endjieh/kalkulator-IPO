@@ -21,6 +21,12 @@ class IPOCalculator {
             addForm.addEventListener('submit', (e) => this.handleAddPosition(e));
         }
 
+        // Stock Code Input - Show currency hint
+        const stockCodeInput = document.getElementById('stockCode');
+        if (stockCodeInput) {
+            stockCodeInput.addEventListener('input', (e) => this.updateCurrencyHint(e.target.value));
+        }
+
         // Sell Position Modal
         const sellModal = document.getElementById('sellModal');
         const closeBtn = document.querySelector('.close');
@@ -41,6 +47,20 @@ class IPOCalculator {
 
         // Real-time price updates
         setInterval(() => this.updateAllPrices(), 1000);
+    }
+
+    updateCurrencyHint(stockCode) {
+        const isIndonesian = this.priceAPI.isIndonesianStock(stockCode);
+        const buyPriceLabel = document.querySelector('label[for="buyPrice"]');
+        const sellPriceLabel = document.querySelector('label[for="sellPrice"]');
+        const currency = isIndonesian ? 'Rp' : '$';
+        
+        if (buyPriceLabel) {
+            buyPriceLabel.textContent = `Buy Price (${currency}):`;
+        }
+        if (sellPriceLabel) {
+            sellPriceLabel.textContent = `Sell Price (${currency}):`;
+        }
     }
 
     handleAddPosition(e) {
@@ -69,7 +89,8 @@ class IPOCalculator {
             buyPrice,
             sellPrice,
             remainingLot: lot,
-            status: 'holding'
+            status: 'holding',
+            isIndonesian: this.priceAPI.isIndonesianStock(stockCode)
         };
 
         try {
@@ -91,12 +112,19 @@ class IPOCalculator {
         const modal = document.getElementById('sellModal');
         const maxQtyText = document.getElementById('maxQuantity');
         const sellQtyInput = document.getElementById('sellQuantity');
+        const sellPriceLabel = document.querySelector('label[for="sellPriceInput"]');
 
         maxQtyText.textContent = `Max quantity: ${position.remainingLot.toFixed(4)}`;
         sellQtyInput.max = position.remainingLot;
         sellQtyInput.value = '';
         document.getElementById('sellPriceInput').value = '';
         document.getElementById('realizedGainPreview').textContent = '$0.00';
+
+        // Update currency label
+        const currency = position.isIndonesian ? 'Rp' : '$';
+        if (sellPriceLabel) {
+            sellPriceLabel.textContent = `Sell Price (${currency}):`;
+        }
 
         modal.classList.add('show');
     }
@@ -127,7 +155,8 @@ class IPOCalculator {
 
         try {
             const transaction = this.portfolio.sellPosition(positionId, quantity, sellPrice);
-            this.showToast(`Sold ${quantity} shares of ${position.stockCode} for $${(quantity * sellPrice).toFixed(2)}`, 'success');
+            const currency = position.isIndonesian ? 'Rp' : '$';
+            this.showToast(`Sold ${quantity} shares of ${position.stockCode} for ${currency}${(quantity * sellPrice).toFixed(2)}`, 'success');
             this.closeSellModal();
             this.renderPortfolio();
             this.updateDashboard();
@@ -142,7 +171,7 @@ class IPOCalculator {
 
         for (const symbol of symbols) {
             try {
-                const price = await this.priceAPI.fetchStockPriceFree(symbol);
+                const price = await this.priceAPI.fetchPrice(symbol);
                 if (price) {
                     this.livePrice.set(symbol, price);
                     this.priceAPI.notifyPriceUpdate(symbol, price);
@@ -157,7 +186,9 @@ class IPOCalculator {
     updatePriceInTable(symbol, price) {
         const cells = document.querySelectorAll(`[data-symbol="${symbol}"][data-column="livePrice"]`);
         cells.forEach(cell => {
-            cell.textContent = `$${price.toFixed(2)}`;
+            const position = this.portfolio.getAllPositions().find(p => p.stockCode === symbol);
+            const currency = position && position.isIndonesian ? 'Rp' : '$';
+            cell.textContent = `${currency}${price.toFixed(2)}`;
             cell.classList.add('price-updated');
             setTimeout(() => cell.classList.remove('price-updated'), 500);
         });
@@ -177,13 +208,14 @@ class IPOCalculator {
             // Update table cells
             const row = document.querySelector(`[data-position-id="${position.id}"]`);
             if (row) {
+                const currency = position.isIndonesian ? 'Rp' : '$';
                 const unrealizedCell = row.querySelector('[data-column="unrealizedGain"]');
                 const unrealizedPercentCell = row.querySelector('[data-column="unrealizedPercent"]');
                 const realizedCell = row.querySelector('[data-column="realizedGain"]');
                 const totalCell = row.querySelector('[data-column="totalGain"]');
 
                 if (unrealizedCell) {
-                    unrealizedCell.textContent = `$${unrealizedGain.toFixed(2)}`;
+                    unrealizedCell.textContent = `${currency}${unrealizedGain.toFixed(2)}`;
                     unrealizedCell.className = unrealizedGain >= 0 ? 'positive' : 'negative';
                 }
 
@@ -194,12 +226,12 @@ class IPOCalculator {
                 }
 
                 if (realizedCell) {
-                    realizedCell.textContent = `$${realizedGain.toFixed(2)}`;
+                    realizedCell.textContent = `${currency}${realizedGain.toFixed(2)}`;
                     realizedCell.className = realizedGain >= 0 ? 'positive' : 'negative';
                 }
 
                 if (totalCell) {
-                    totalCell.textContent = `$${totalGain.toFixed(2)}`;
+                    totalCell.textContent = `${currency}${totalGain.toFixed(2)}`;
                     totalCell.className = totalGain >= 0 ? 'positive' : 'negative';
                 }
             }
@@ -227,6 +259,8 @@ class IPOCalculator {
             const unrealizedPercent = position.remainingLot > 0 ? 
                 ((unrealizedGain) / (position.remainingLot * position.buyPrice)) * 100 : 0;
 
+            const currency = position.isIndonesian ? 'Rp' : '$';
+
             const row = document.createElement('tr');
             row.setAttribute('data-position-id', position.id);
 
@@ -239,13 +273,13 @@ class IPOCalculator {
                 <td>${position.accountName}</td>
                 <td>${position.stockCode}</td>
                 <td>${position.remainingLot.toFixed(4)}</td>
-                <td>$${position.buyPrice.toFixed(2)}</td>
-                <td data-symbol="${position.stockCode}" data-column="livePrice">$${livePrice.toFixed(2)}</td>
-                <td>$${position.sellPrice > 0 ? position.sellPrice.toFixed(2) : '-'}</td>
-                <td data-column="unrealizedGain" class="${unrealizedGain >= 0 ? 'positive' : 'negative'}">$${unrealizedGain.toFixed(2)}</td>
+                <td>${currency}${position.buyPrice.toFixed(2)}</td>
+                <td data-symbol="${position.stockCode}" data-column="livePrice">${currency}${livePrice.toFixed(2)}</td>
+                <td>${currency}${position.sellPrice > 0 ? position.sellPrice.toFixed(2) : '-'}</td>
+                <td data-column="unrealizedGain" class="${unrealizedGain >= 0 ? 'positive' : 'negative'}">${currency}${unrealizedGain.toFixed(2)}</td>
                 <td data-column="unrealizedPercent" class="${unrealizedPercent >= 0 ? 'positive' : 'negative'}">${unrealizedPercent.toFixed(2)}%</td>
-                <td data-column="realizedGain" class="${realizedGain >= 0 ? 'positive' : 'negative'}">$${realizedGain.toFixed(2)}</td>
-                <td data-column="totalGain" class="${totalGain >= 0 ? 'positive' : 'negative'}">$${totalGain.toFixed(2)}</td>
+                <td data-column="realizedGain" class="${realizedGain >= 0 ? 'positive' : 'negative'}">${currency}${realizedGain.toFixed(2)}</td>
+                <td data-column="totalGain" class="${totalGain >= 0 ? 'positive' : 'negative'}">${currency}${totalGain.toFixed(2)}</td>
                 <td><span class="${statusClass}">${statusText}</span></td>
                 <td>
                     <div class="action-group">
@@ -265,30 +299,83 @@ class IPOCalculator {
         let totalUnrealizedGain = 0;
         let totalRealizedGain = this.portfolio.calculateTotalRealizedGain();
 
+        // Group by currency to show both IDR and USD
+        let totalInvestmentUSD = 0;
+        let currentValueUSD = 0;
+        let totalUnrealizedGainUSD = 0;
+
+        let totalInvestmentIDR = 0;
+        let currentValueIDR = 0;
+        let totalUnrealizedGainIDR = 0;
+
         positions.forEach(position => {
             const livePrice = this.livePrice.get(position.stockCode) || position.buyPrice;
-            totalInvestment += position.lot * position.buyPrice;
-            currentValue += position.remainingLot * livePrice;
-            totalUnrealizedGain += this.portfolio.calculateUnrealizedGain(position.id, livePrice);
+            const investAmount = position.lot * position.buyPrice;
+            const currValue = position.remainingLot * livePrice;
+            const unrealGain = this.portfolio.calculateUnrealizedGain(position.id, livePrice);
+
+            if (position.isIndonesian) {
+                totalInvestmentIDR += investAmount;
+                currentValueIDR += currValue;
+                totalUnrealizedGainIDR += unrealGain;
+            } else {
+                totalInvestmentUSD += investAmount;
+                currentValueUSD += currValue;
+                totalUnrealizedGainUSD += unrealGain;
+            }
+
+            totalInvestment += investAmount;
+            currentValue += currValue;
+            totalUnrealizedGain += unrealGain;
         });
 
         const totalGain = totalUnrealizedGain + totalRealizedGain;
         const overallReturn = totalInvestment > 0 ? (totalGain / totalInvestment) * 100 : 0;
 
-        const updateMetric = (elementId, value, isPercent = false) => {
+        const updateMetric = (elementId, valueUSD, valueIDR, isPercent = false) => {
             const element = document.getElementById(elementId);
             if (element) {
-                const displayValue = isPercent ? value.toFixed(2) + '%' : '$' + value.toFixed(2);
+                let displayValue = '';
+                if (isPercent) {
+                    displayValue = overallReturn.toFixed(2) + '%';
+                } else {
+                    if (valueUSD > 0 && valueIDR > 0) {
+                        displayValue = `$${valueUSD.toFixed(2)} + Rp${valueIDR.toFixed(2)}`;
+                    } else if (valueUSD > 0) {
+                        displayValue = `$${valueUSD.toFixed(2)}`;
+                    } else if (valueIDR > 0) {
+                        displayValue = `Rp${valueIDR.toFixed(2)}`;
+                    } else {
+                        displayValue = '$0.00';
+                    }
+                }
                 element.textContent = displayValue;
-                element.className = value >= 0 ? 'positive' : 'negative';
+                const totalValue = valueUSD + valueIDR;
+                element.className = totalValue >= 0 ? 'positive' : 'negative';
             }
         };
 
-        updateMetric('totalInvestment', totalInvestment);
-        updateMetric('currentValue', currentValue);
-        updateMetric('realizedGain', totalRealizedGain);
-        updateMetric('unrealizedGain', totalUnrealizedGain);
-        updateMetric('overallReturn', overallReturn, true);
+        updateMetric('totalInvestment', totalInvestmentUSD, totalInvestmentIDR);
+        updateMetric('currentValue', currentValueUSD, currentValueIDR);
+        
+        // Realized and Unrealized Gain
+        const realizedElement = document.getElementById('realizedGain');
+        if (realizedElement) {
+            realizedElement.textContent = totalRealizedGain >= 0 ? `$${totalRealizedGain.toFixed(2)}` : `-$${Math.abs(totalRealizedGain).toFixed(2)}`;
+            realizedElement.className = totalRealizedGain >= 0 ? 'positive' : 'negative';
+        }
+
+        const unrealElement = document.getElementById('unrealizedGain');
+        if (unrealElement) {
+            unrealElement.textContent = totalUnrealizedGain >= 0 ? `$${totalUnrealizedGain.toFixed(2)}` : `-$${Math.abs(totalUnrealizedGain).toFixed(2)}`;
+            unrealElement.className = totalUnrealizedGain >= 0 ? 'positive' : 'negative';
+        }
+
+        const overallElement = document.getElementById('overallReturn');
+        if (overallElement) {
+            overallElement.textContent = overallReturn.toFixed(2) + '%';
+            overallElement.className = overallReturn >= 0 ? 'positive' : 'negative';
+        }
     }
 
     showToast(message, type = 'success') {
