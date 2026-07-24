@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IPO Portfolio Calculator</title>
+    <title>IPO Portfolio Calculator - US & Indonesia Stocks</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -12,6 +12,7 @@
         <header class="header">
             <div class="header-content">
                 <h1>📈 IPO Portfolio Calculator</h1>
+                <p class="subtitle">Track US & Indonesia Stock Investments</p>
                 <div class="header-info">
                     <span id="sessionId" class="session-badge"></span>
                     <button id="logoutBtn" class="logout-btn">Logout</button>
@@ -58,6 +59,10 @@
             <!-- Add Position Form -->
             <section class="form-section">
                 <h2>Add New Position</h2>
+                <div class="info-box">
+                    <p><strong>US Stocks:</strong> Enter ticker symbols like AAPL, MSFT, GOOGL</p>
+                    <p><strong>Indonesia Stocks:</strong> Enter ticker symbols like BBCA, BBRI, ASII (or with .JK suffix)</p>
+                </div>
                 <form id="addPositionForm" class="form">
                     <div class="form-group">
                         <label for="accountName">Account Name:</label>
@@ -66,7 +71,7 @@
 
                     <div class="form-group">
                         <label for="stockCode">Stock Code:</label>
-                        <input type="text" id="stockCode" placeholder="e.g., AAPL" required>
+                        <input type="text" id="stockCode" placeholder="e.g., AAPL or BBCA" required>
                     </div>
 
                     <div class="form-group">
